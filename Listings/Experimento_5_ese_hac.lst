@@ -1,0 +1,180 @@
+C51 COMPILER V9.60.7.0   EXPERIMENTO_5_ESE_HAC                                             05/13/2024 09:38:48 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE EXPERIMENTO_5_ESE_HAC
+OBJECT MODULE PLACED IN .\Objects\Experimento_5_ese_hac.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE Experimento_5_ese_hac.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRIN
+                    -T(.\Listings\Experimento_5_ese_hac.lst) TABS(2) OBJECT(.\Objects\Experimento_5_ese_hac.obj)
+
+line level    source
+
+   1          #include <REG51F.H>
+   2          
+   3          char TxBuffer[16];
+   4          unsigned char TxIn = 0;
+   5          unsigned char TxOut = 0;
+   6          char RxBuffer[16];
+   7          unsigned char RxIn = 0;
+   8          unsigned char RxOut = 0;
+   9          
+  10          unsigned char TxOcupado = 0;
+  11          unsigned char RecebeuString = 0;
+  12          
+  13          void serial_inicializa(){
+  14   1        
+  15   1        TR1 = 0;
+  16   1        TMOD = (TMOD & 0x0f) | 0x2f;
+  17   1        ET1 = 0;
+  18   1        TF1 = 1;
+  19   1        TR1 = 1;
+  20   1        // Mantendo os valores do Experimento 4
+  21   1        SCON = 0x5c;
+  22   1        TH1 = 0xe6;
+  23   1        PCON =  PCON & 0x7f;
+  24   1      }
+  25          
+  26          void InsertFromSerialToRxBuffer(char c){
+  27   1        if ((RxIn + 1) % 16 == RxOut){
+  28   2          return ;
+  29   2        }
+  30   1        RxBuffer[RxIn] = c;
+  31   1        
+  32   1        if(RxIn == 15){
+  33   2          RxIn = 0;
+  34   2        }else{
+  35   2          RxIn++;
+  36   2        }
+  37   1        if(c == '$'){
+  38   2          RecebeuString++;
+  39   2        }
+  40   1        return;
+  41   1      }
+  42          char TxBufferVazio(){
+  43   1        if(TxIn == TxOut){
+  44   2          return 1;
+  45   2        }else{
+  46   2          return 0;
+  47   2        }
+  48   1      }
+  49          void interruption_function(void) interrupt 4{
+  50   1        char TxVazio;
+  51   1        if(RI == 1){
+  52   2          RI = 0;
+  53   2          InsertFromSerialToRxBuffer(SBUF);
+  54   2          
+C51 COMPILER V9.60.7.0   EXPERIMENTO_5_ESE_HAC                                             05/13/2024 09:38:48 PAGE 2   
+
+  55   2        }
+  56   1        if (TI == 1){
+  57   2          TI = 0;
+  58   2          TxVazio = TxBufferVazio();
+  59   2          if(!TxVazio){
+  60   3            SBUF = TxBuffer[TxOut];
+  61   3            if(TxOut == 15){
+  62   4              TxOut = 0;
+  63   4            }else{
+  64   4              TxOut++;
+  65   4            }
+  66   3          }else{
+  67   3            TxOcupado = 0;
+  68   3          }
+  69   2          
+  70   2        }
+  71   1        
+  72   1      }
+  73          char SendChar(char c){
+  74   1        if((TxIn + 1)% 16 == TxOut){
+  75   2          return 0;
+  76   2        }
+  77   1        TxBuffer[TxIn] = c;
+  78   1        if(TxIn == 15){
+  79   2          TxIn = 0;
+  80   2        }else{
+  81   2          TxIn++;
+  82   2        }
+  83   1        if(!TxOcupado){
+  84   2          TxOcupado = 1;
+  85   2          TI = 1;
+  86   2        }
+  87   1        return 1;
+  88   1      }
+  89          void SendString(char *s){
+  90   1      
+  91   1        char result;
+  92   1        
+  93   1        while(*s != '$'){
+  94   2          result = SendChar(*s);
+  95   2          s++;
+  96   2        }
+  97   1        result = SendChar(*s);
+  98   1        return;
+  99   1      }
+ 100          char ReceiveChar(){
+ 101   1        
+ 102   1        char result;
+ 103   1        
+ 104   1        result = RxBuffer[RxOut];
+ 105   1        
+ 106   1        if(RxOut == 15){
+ 107   2          RxOut = 0;
+ 108   2        }else{
+ 109   2          RxOut++;
+ 110   2        }
+ 111   1        return result;
+ 112   1      }
+ 113          
+ 114          void ReceiveString(char *s){
+ 115   1        char nextChar;
+ 116   1        
+C51 COMPILER V9.60.7.0   EXPERIMENTO_5_ESE_HAC                                             05/13/2024 09:38:48 PAGE 3   
+
+ 117   1        nextChar = ReceiveChar();
+ 118   1        while(nextChar != '$'){
+ 119   2          *s = nextChar;
+ 120   2          s++;
+ 121   2          nextChar = ReceiveChar();
+ 122   2        }
+ 123   1        *s = nextChar;
+ 124   1        RecebeuString--;
+ 125   1        return;
+ 126   1      }
+ 127          char RxBufferVazio(){
+ 128   1        if(RxIn == RxOut){
+ 129   2          return 1;
+ 130   2        }else{
+ 131   2          return 0;
+ 132   2        }
+ 133   1      }
+ 134          void main(){
+ 135   1        char temp[16];
+ 136   1        char RxVazio;
+ 137   1        serial_inicializa();
+ 138   1        ES = 1;
+ 139   1        EA = 1;
+ 140   1        
+ 141   1        
+ 142   1        while(1){
+ 143   2          if(RecebeuString > 0){
+ 144   3            RxVazio = RxBufferVazio();
+ 145   3            if(RxVazio == 1){
+ 146   4              continue;
+ 147   4            }
+ 148   3            ReceiveString(temp);
+ 149   3            SendString(temp);
+ 150   3          }
+ 151   2        } 
+ 152   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    308    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     38      16
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

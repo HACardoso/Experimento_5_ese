@@ -1,0 +1,4 @@
+".\Objects\STARTUP.obj",
+".\Objects\Experimento_5_ese_hac.obj" 
+TO ".\Objects\Experimento_5_ese_hac" 
+PRINT(".\Listings\Experimento_5_ese_hac.m51") RAMSIZE(256) 
